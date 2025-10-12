@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Contributing Guide
+    url: https://github.com/STRONG-OE-200/CAREON-BACKEND/blob/dev/.github/CONTRIBUTING.md
+    about: 기여 규칙과 커밋/브랜치 컨벤션을 반드시 확인해주세요.
