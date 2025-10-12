@@ -1,0 +1,31 @@
+name: ✨ Feature Request
+description: 새로운 기능을 제안합니다.
+title: "[FEAT] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        💡 새로운 기능이나 개선점을 제안해주세요.
+  - type: input
+    id: summary
+    attributes:
+      label: 기능 요약
+      description: 어떤 기능을 추가하고 싶은가요?
+      placeholder: 회원가입 시 이메일 인증 기능 추가
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: 세부 설명
+      description: 기능의 목적과 필요성을 구체적으로 적어주세요.
+      placeholder: |
+        현재는 이메일 인증 절차가 없어 보안상 문제가 있습니다.
+        이메일 인증을 통해 사용자의 신뢰도를 높이고 싶습니다.
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 효과
+      description: 이 기능이 추가되면 어떤 효과가 있나요?
+      placeholder: 사용자 계정 보안 강화
