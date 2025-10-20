@@ -1,0 +1,56 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: sebinbaek0918/careon-backend-web:latest
+
+      - name: Build and push Nginx image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./nginx
+          file: ./nginx/Dockerfile
+          push: true
+          tags: sebinbaek0918/careon-backend-nginx:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script: |
+            set -e  # 오류 발생 시 스크립트 즉시 중단
+            echo "Pulling latest images..."
+            sudo docker compose pull
+            echo "Running migrations..."
+            sudo docker compose run web python manage.py migrate --noinput
+            echo "Starting containers..."
+            sudo docker compose up -d
+            echo "Cleaning up unused images..."
+            sudo docker image prune -f
