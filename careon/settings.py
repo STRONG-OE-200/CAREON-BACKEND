@@ -35,8 +35,7 @@ def _csv(key: str, default: str = ""):
 
 ALLOWED_HOSTS = _csv("ALLOWED_HOSTS", "*")
 CSRF_TRUSTED_ORIGINS = _csv("CSRF_TRUSTED_ORIGINS", "")
-# (선택) CORS 필요 시: 
-# CORS_ALLOWED_ORIGINS = _csv("CORS_ALLOWED_ORIGINS", "")
+CORS_ALLOWED_ORIGINS = _csv("CORS_ALLOWED_ORIGINS", "")
 
 
 
@@ -50,6 +49,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "user",
 ]
 
 MIDDLEWARE = [
@@ -170,3 +171,10 @@ if not DEBUG:
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+AUTH_USER_MODEL = 'user.CustomUser'
+
+SIMPLE_JWT = {
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
