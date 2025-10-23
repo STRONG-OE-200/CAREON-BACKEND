@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,7 +36,7 @@ def _csv(key: str, default: str = ""):
 ALLOWED_HOSTS = _csv("ALLOWED_HOSTS", "*")
 CSRF_TRUSTED_ORIGINS = _csv("CSRF_TRUSTED_ORIGINS", "")
 CORS_ALLOWED_ORIGINS = _csv("CORS_ALLOWED_ORIGINS", "")
-
+CORS_ALLOW_CREDENTIALS=os.getenv("CORS_ALLOW_CREDENTIALS","True") == "True"
 
 
 # Application definition
@@ -175,6 +175,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = 'user.CustomUser'
 
 SIMPLE_JWT = {
+    SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),  # 5~15분 추천
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),    # 7~14일 추천
+}
+}
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
 }
