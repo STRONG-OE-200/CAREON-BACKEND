@@ -50,7 +50,9 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "channels",
     "user",
+    "schedule",
 ]
 
 MIDDLEWARE = [
@@ -81,6 +83,19 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "careon.wsgi.application"
+ASGI_APPLICATION = "careon.asgi.application"   
+
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [(REDIS_HOST, REDIS_PORT)]},
+    }
+}
+
 
 
 # Database
@@ -175,12 +190,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = 'user.CustomUser'
 
 SIMPLE_JWT = {
-    SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),  # 5~15분 추천
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),    # 7~14일 추천
-}
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),  # 5~15분 권장
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),    # 7~14일 권장
 }
 
 REST_FRAMEWORK = {

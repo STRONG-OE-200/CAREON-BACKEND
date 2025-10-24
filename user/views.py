@@ -71,6 +71,8 @@ class LogoutView(APIView):
         response = Response({"message": "정상적으로 로그아웃되었습니다."}, status=status.HTTP_200_OK)
 
         opts = cookie_kwargs_for(request)
+        opts.pop("max_age", None)
+        opts.pop("expires", None)
         response.set_cookie("refresh_token", "", max_age=0, expires=0, **opts)
 
         return response
