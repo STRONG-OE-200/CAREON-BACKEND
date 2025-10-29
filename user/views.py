@@ -21,7 +21,7 @@ class SignupView(APIView):
             return Response({
                 "message": "✅회원가입이 완료되었습니다.",
                 "id": user.id,
-                "nickname" : user.nickname,
+                "name" : user.name,
                 "date_joined": user.date_joined
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -42,9 +42,7 @@ class LoginView(APIView):
                 "message" : "로그인 성공",
                 "access": access_token,
                 "email": user.email,
-                "nickname": user.nickname,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
+                "name": user.name,
 
             }, status=status.HTTP_200_OK)
 

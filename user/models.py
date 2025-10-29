@@ -15,22 +15,9 @@ class CustomUser(AbstractUser):
         db_index=True,
     )
 
-    nickname = models.CharField(
-        max_length=50,
-        unique=True,
-        null=False,
-        blank=False,
-        validators=[
-            RegexValidator(
-                regex=r'^[a-zA-Z0-9가-힣_.]{2,20}$',
-                message="닉네임은 2~20자, 영문/숫자/한글/밑줄/점만 사용할 수 있습니다."
-            )
-        ],
-    )
-
-    first_name = models.CharField(max_length=150, null=False, blank=True, default='')
-    last_name = models.CharField(max_length=150, null=False, blank=True, default='')
+    name = models.CharField(max_length=150, null=False, blank=True, default='')
     date_joined = models.DateTimeField(default=timezone.now, db_index=True)
+    is_active = models.BooleanField(default=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = [] 
@@ -41,7 +28,7 @@ class CustomUser(AbstractUser):
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.email
+        return self.name
 
     
 

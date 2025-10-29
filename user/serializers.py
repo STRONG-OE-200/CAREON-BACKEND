@@ -14,45 +14,23 @@ class SignupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'password', 'password2', 'nickname', 'first_name', 'last_name', 'date_joined')
-        read_only_fields = ('id', 'date_joined')
+        fields = ('id', 'email', 'password', 'password2', 'name', 'date_joined','is_active')
+        read_only_fields = ('id', 'date_joined',"is_active")
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
             raise ValidationError("이미 사용 중인 이메일입니다.")
         return value
 
-    def validate_nickname(self, value):
-        if value and User.objects.filter(nickname=value).exists():
-            raise ValidationError("이미 사용 중인 닉네임입니다.")
-        return value
-    
-    def validate(self, attrs):
-        if not attrs.get('is_social'):
-            if not attrs.get('password') or not attrs.get('password2'):
-                raise ValidationError({"password": "비밀번호를 입력해주세요."})
-            if attrs['password'] != attrs['password2']:
-                raise ValidationError({"password2": "비밀번호가 일치하지 않습니다."})
-        return attrs
-    
+
 
     def create(self, validated_data):
         validated_data.pop('password2', None)
         password = validated_data.pop('password', None)
 
-        nickname = validated_data.get('nickname')
-        first_name = validated_data.get('first_name', 'user')
-
-        if not nickname:
-            nickname = f"{first_name}{random.randint(1000,9999)}"
-            while User.objects.filter(nickname=nickname).exists():
-                nickname = f"{first_name}{random.randint(1000,9999)}"
-
         user = User.objects.create(
             email=validated_data.get('email'),
-            nickname=nickname,
-            first_name=first_name,
-            last_name=validated_data.get('last_name', ''),
+            name = validated_data.get('name'),
         )
 
         user.set_password(password)
