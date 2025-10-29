@@ -23,6 +23,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('healthz/', views.health_check),
     path('auth/', include("user.urls")),
+    path("", include("room.urls")), 
 ]
 
 
