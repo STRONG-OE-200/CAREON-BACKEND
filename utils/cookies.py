@@ -19,13 +19,17 @@ def cookie_kwargs_for(request):
         rt_lifetime = timedelta(days=7)
 
     max_age = int(rt_lifetime.total_seconds())
+    
 
+    samesite = "None" if cross else "Lax"
+    
     kwargs = {
         "httponly": True,
-        "secure": True,                           # 운영 https 가정
-        "samesite": "None" if cross else "Lax",
+        "secure": True if samesite == "None" else (not settings.DEBUG),
+        #  ↑ 교차 사이트(None)일 땐 무조건 Secure (브라우저 규칙)
+        "samesite": samesite,
         "path": "/",
-        "max_age": max_age,                       # 또는 "expires": timezone.now()+rt_lifetime
+        "max_age": max_age,
     }
 
     # 여러 서브도메인에서 쿠키를 공유해야 한다면 여기를 활성화
