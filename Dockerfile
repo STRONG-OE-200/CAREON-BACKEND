@@ -13,4 +13,4 @@ COPY . .
 RUN python manage.py collectstatic --no-input
 
 #config 이름 주의
-CMD ["gunicorn", "careon.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "careon.asgi:application"]

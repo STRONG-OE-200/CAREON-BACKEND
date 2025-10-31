@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,7 +36,7 @@ def _csv(key: str, default: str = ""):
 ALLOWED_HOSTS = _csv("ALLOWED_HOSTS", "*")
 CSRF_TRUSTED_ORIGINS = _csv("CSRF_TRUSTED_ORIGINS", "")
 CORS_ALLOWED_ORIGINS = _csv("CORS_ALLOWED_ORIGINS", "")
-
+CORS_ALLOW_CREDENTIALS=os.getenv("CORS_ALLOW_CREDENTIALS","True") == "True"
 
 
 # Application definition
@@ -48,12 +48,17 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "channels",
     "user",
+    "room",
+    "schedule",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -81,6 +86,19 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "careon.wsgi.application"
+ASGI_APPLICATION = "careon.asgi.application"   
+
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [(REDIS_HOST, REDIS_PORT)]},
+    }
+}
+
 
 
 # Database
@@ -177,4 +195,12 @@ AUTH_USER_MODEL = 'user.CustomUser'
 SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),  # 5~15분 권장
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),    # 7~14일 권장
+}
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
 }

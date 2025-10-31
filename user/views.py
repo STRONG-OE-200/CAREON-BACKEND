@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 from utils.cookies import cookie_kwargs_for, is_cross_site
 from .serializers import SignupSerializer, LoginSerializer
 from  rest_framework_simplejwt.tokens import RefreshToken
+from room.models import RoomMembership
 
 # Create your views here.
 User = get_user_model()
@@ -21,7 +22,7 @@ class SignupView(APIView):
             return Response({
                 "message": "✅회원가입이 완료되었습니다.",
                 "id": user.id,
-                "nickname" : user.nickname,
+                "name" : user.name,
                 "date_joined": user.date_joined
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -37,14 +38,24 @@ class LoginView(APIView):
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
+        
+            room_ids = (
+                RoomMembership.objects
+                .filter(user=user)
+                .order_by('-joined_at') 
+                .values_list('room_id', flat=True)
+                )
+
+            room_ids = list(room_ids)
+            room_ids = room_ids if len(room_ids) > 0 else None
+
 
             response = Response({
                 "message" : "로그인 성공",
                 "access": access_token,
                 "email": user.email,
-                "nickname": user.nickname,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
+                "name": user.name,
+                "room_ids": room_ids
 
             }, status=status.HTTP_200_OK)
 
@@ -71,6 +82,8 @@ class LogoutView(APIView):
         response = Response({"message": "정상적으로 로그아웃되었습니다."}, status=status.HTTP_200_OK)
 
         opts = cookie_kwargs_for(request)
+        opts.pop("max_age", None)
+        opts.pop("expires", None)
         response.set_cookie("refresh_token", "", max_age=0, expires=0, **opts)
 
         return response
