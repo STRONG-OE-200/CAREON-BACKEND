@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework.exceptions import ValidationError
 import random
+from room.models import RoomMembership
 # from .models import SocialAccount
 
 User = get_user_model()
@@ -41,6 +42,7 @@ class SignupSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+
 
     def validate(self,data):
         email = data.get("email")
