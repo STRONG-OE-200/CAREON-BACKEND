@@ -1,11 +1,3 @@
-name: "Default PR Template"
-about: "기본 PR 템플릿"
-title: ''
-labels: ''
-assignees: ''
-
-body: |
-
 ## 📝 PR 요약
 
 > 이번 PR에서 어떤 변경이 이루어졌는지 간단히 설명해주세요.
