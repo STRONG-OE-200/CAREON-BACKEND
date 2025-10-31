@@ -47,7 +47,6 @@ jobs:
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
             set -e
-            cd /home/ubuntu/CAREON-BACKEND   # ✅ docker-compose.yml이 있는 경로로 이동
 
             echo "1️⃣ Pulling latest images..."
             sudo docker compose pull
