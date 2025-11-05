@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny
 from utils.cookies import cookie_kwargs_for, is_cross_site
 from .serializers import SignupSerializer, LoginSerializer
 from  rest_framework_simplejwt.tokens import RefreshToken
-from room.models import RoomMembership
+from room.models import Room, RoomMembership
 
 # Create your views here.
 User = get_user_model()
@@ -31,32 +31,42 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data = request.data)
+        serializer = LoginSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.validated_data['user']
 
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
-        
-            room_ids = (
-                RoomMembership.objects
-                .filter(user=user)
-                .order_by('-joined_at') 
-                .values_list('room_id', flat=True)
-                )
 
-            room_ids = list(room_ids)
-            room_ids = room_ids if len(room_ids) > 0 else None
+            owned_ids = list(
+                Room.objects.filter(owner=user).values_list('id', flat=True)
+            )
 
+            memberships = list(
+                RoomMembership.objects.filter(user=user).values('room_id')
+            )
+
+            rooms_payload = []
+            seen = set()
+
+            for rid in owned_ids:
+                rooms_payload.append({"room_id": rid, "isOwner": True})
+                seen.add(rid)
+
+            for m in memberships:
+                rid = m["room_id"]
+                if rid in seen:
+                    continue
+                rooms_payload.append({"room_id": rid, "isOwner": False})
+                seen.add(rid)
 
             response = Response({
-                "message" : "로그인 성공",
+                "message": "로그인 성공",
                 "access": access_token,
                 "email": user.email,
                 "name": user.name,
-                "room_ids": room_ids
-
+                "rooms": rooms_payload,
             }, status=status.HTTP_200_OK)
 
             opts = cookie_kwargs_for(request)
