@@ -24,7 +24,7 @@ urlpatterns = [
     path('healthz/', views.health_check),
     path('auth/', include("user.urls")),
     path("", include("room.urls")), 
-    path("schedules/", include("schedule.urls")),
+    path("", include("schedule.urls")),
 ]
 
 

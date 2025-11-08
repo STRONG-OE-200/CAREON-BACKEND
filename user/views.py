@@ -30,6 +30,19 @@ class SignupView(APIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    def _membership_index(self, room_id: int, user_id: int):
+    
+        user_ids = list(
+            RoomMembership.objects
+            .filter(room_id=room_id)
+            .order_by('joined_at')
+            .values_list('user_id', flat=True)
+        )
+        try:
+            return user_ids.index(user_id)
+        except ValueError:
+            return None
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
@@ -42,7 +55,6 @@ class LoginView(APIView):
             owned_ids = list(
                 Room.objects.filter(owner=user).values_list('id', flat=True)
             )
-
             memberships = list(
                 RoomMembership.objects.filter(user=user).values('room_id')
             )
@@ -50,23 +62,35 @@ class LoginView(APIView):
             rooms_payload = []
             seen = set()
 
+            # 방장인 방들
             for rid in owned_ids:
-                rooms_payload.append({"room_id": rid, "isOwner": True})
+                rooms_payload.append({
+                    "room_id": rid,
+                    "isOwner": True,
+            
+                    "membership_index": self._membership_index(rid, user.id),
+                })
                 seen.add(rid)
 
+            # 멤버로 속한 방들
             for m in memberships:
                 rid = m["room_id"]
                 if rid in seen:
                     continue
-                rooms_payload.append({"room_id": rid, "isOwner": False})
+                rooms_payload.append({
+                    "room_id": rid,
+                    "isOwner": False,
+                    "membership_index": self._membership_index(rid, user.id),
+                })
                 seen.add(rid)
 
             response = Response({
                 "message": "로그인 성공",
+                "user_id": user.id,            
                 "access": access_token,
                 "email": user.email,
                 "name": user.name,
-                "rooms": rooms_payload,
+                "rooms": rooms_payload,       
             }, status=status.HTTP_200_OK)
 
             opts = cookie_kwargs_for(request)
