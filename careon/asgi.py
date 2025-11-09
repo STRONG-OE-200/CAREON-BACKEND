@@ -1,22 +1,24 @@
-"""
-ASGI config for careon project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
-"""
 # careon/asgi.py
 import os
-import django
-from django.core.asgi import get_asgi_application
-from channels.routing import ProtocolTypeRouter, URLRouter
-from schedule.routing import websocket_urlpatterns  # ← try/except 지우고 직접 import
 
+# 1) settings 먼저 지정
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "careon.settings")
+
+# 2) django 초기화
+import django
 django.setup()
 
+# 3) 이후에야 django/DRF 의존 모듈 import
+from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from schedule.ws_auth import JWTAuthMiddleware
+from schedule.routing import websocket_urlpatterns
+
+django_asgi_app = get_asgi_application()
+
 application = ProtocolTypeRouter({
-    "http": get_asgi_application(),
-    "websocket": URLRouter(websocket_urlpatterns),
+    "http": django_asgi_app,
+    "websocket": JWTAuthMiddleware(
+        URLRouter(websocket_urlpatterns)
+    ),
 })
