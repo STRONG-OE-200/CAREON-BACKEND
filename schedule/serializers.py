@@ -90,8 +90,7 @@ class ScheduleNeededSubmitSerializer(serializers.Serializer):
         return value
 
 
-ISO_WEEK_RE = re.compile(r"^\d{4}-W\d{2}$")  # e.g., 2025-W45
-
+ISO_WEEK_RE = re.compile(r'^(?P<year>\d{4})-W(?P<week>\d{1,2})$')
 
 class ScheduleQuerySerializer(serializers.Serializer):
     room_id = serializers.IntegerField(
@@ -101,6 +100,9 @@ class ScheduleQuerySerializer(serializers.Serializer):
             "invalid": "room_id must be an integer",
         },
     )
+
+    schedule_id = serializers.IntegerField(required=False)
+
     week = serializers.CharField(required=False, allow_blank=False)
     only = serializers.ChoiceField(
         required=False,
@@ -114,9 +116,16 @@ class ScheduleQuerySerializer(serializers.Serializer):
     )
 
     def validate_week(self, value: str) -> str:
-        # 허용: YYYY-Www 또는 YYYY-MM-DD
-        if ISO_WEEK_RE.match(value):
-            return value
+
+        m = ISO_WEEK_RE.match(value)
+        if m:
+            y = int(m.group('year'))
+            w = int(m.group('week'))
+            if not (1 <= w <= 53):
+                raise serializers.ValidationError("ISO week must be between 1 and 53.")
+            return f"{y}-W{w:02d}"
+
+        # ISO date (YYYY-MM-DD)
         try:
             date.fromisoformat(value)
             return value
@@ -124,6 +133,16 @@ class ScheduleQuerySerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "week must be 'YYYY-Www' (ISO week, e.g. 2025-W45) or 'YYYY-MM-DD'."
             )
+
+    def validate(self, attrs):
+        week = attrs.get("week")
+        schedule_id = attrs.get("schedule_id")
+        if week and schedule_id:
+            raise serializers.ValidationError(
+                {"non_field_errors": ["Use either 'week' or 'schedule_id' (not both)."]}
+            )
+        return attrs
+
 
 
 def compute_sunday_range_from_week(week: str | None) -> tuple[date, date]:
