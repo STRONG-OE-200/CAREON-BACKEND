@@ -1,6 +1,8 @@
+# schedule/routing.py
 from django.urls import re_path
-from .consumers import ScheduleConsumer
+from .consumers import ScheduleRoomConsumer
 
 websocket_urlpatterns = [
-    re_path(r"^ws/schedule/(?P<room_id>\d+)/$", ScheduleConsumer.as_asgi()),
+    
+    re_path(r"^ws/rooms/(?P<room_id>\d+)/schedules/$", ScheduleRoomConsumer.as_asgi()),
 ]

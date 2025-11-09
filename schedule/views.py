@@ -6,12 +6,15 @@ from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from collections import defaultdict
+from schedule.broadcast import broadcast_to_room
 
 from room.models import Room, RoomMembership
 from room.permissions import IsRoomOwner, IsRoomMemberOrOwner
 from .models import *
 from .serializers import *
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 class ScheduleReadCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -25,6 +28,16 @@ class ScheduleReadCreateView(APIView):
         try:
             with transaction.atomic():
                 schedule = ser.save()
+                transaction.on_commit(lambda: broadcast_to_room(
+                    schedule.room_id,
+                    {
+                        "event": "schedule.created",
+                        "room_id": schedule.room_id,
+                        "week_id": schedule.id,
+                        "week_range": [schedule.start_date.isoformat(), schedule.end_date.isoformat()],
+                        "status": schedule.status,
+                    },
+                ))
         except IntegrityError:
             return Response({"detail": "이미 동일한 주차 스케줄이 존재합니다."}, status=status.HTTP_409_CONFLICT)
         out = ScheduleResponseSerializer(schedule).data
@@ -34,6 +47,7 @@ class ScheduleReadCreateView(APIView):
         qser = ScheduleQuerySerializer(data=request.query_params)
         qser.is_valid(raise_exception=True)
         room_id = qser.validated_data["room_id"]
+        schedule_id = qser.validated_data.get("schedule_id")   # ✅ 추가
         week = qser.validated_data.get("week")
         only = qser.validated_data.get("only")
         expand = qser.validated_data.get("expand")
@@ -42,8 +56,21 @@ class ScheduleReadCreateView(APIView):
         if not IsRoomMemberOrOwner().has_object_permission(request, self, room):
             return Response({"detail": "이 방의 스케줄을 조회할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
 
-        start_date, end_date = compute_sunday_range_from_week(week)
-        schedule = Schedule.objects.filter(room_id=room_id, start_date=start_date).first()
+    
+        schedule = None
+        if schedule_id is not None:
+            schedule = get_object_or_404(Schedule, id=schedule_id)
+            if schedule.room_id != room_id:
+                return Response(
+                    {"detail": "schedule_id가 해당 room_id에 속하지 않습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            start_date, end_date = schedule.start_date, schedule.end_date
+        else:
+            # 기존 week 로직 (없으면 현재 주)
+            start_date, end_date = compute_sunday_range_from_week(week)
+            schedule = Schedule.objects.filter(room_id=room_id, start_date=start_date).first()
+
 
         base = {
             "room_id": room_id,
@@ -109,7 +136,32 @@ class ScheduleReadCreateView(APIView):
         base["meta"] = {
             "updated_at": (schedule.finalized_at or schedule.created_at).isoformat() if schedule else None,
         }
-        return Response(ScheduleReadResponseSerializer(base).data, status=status.HTTP_200_OK)
+        out = ScheduleReadResponseSerializer(base).data
+
+        broadcast = request.query_params.get("broadcast") in ("1", "true", "True")
+        if broadcast:
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"room_{room_id}_schedules",
+                    {
+                        "type": "schedule.update",
+                        "payload": {
+                            "event": "schedule_read",
+                            "room_id": room_id,
+                            "week_range": out.get("week_range"),
+                            "status": out.get("status"),
+                            "only": only,
+                            "expand": expand,
+                            "masterGrid": out.get("masterGrid"),
+                            "meta": out.get("meta"),
+                        },
+                    },
+                )
+            except Exception as e:
+                print("Broadcast failed:", e)
+
+        return Response(out, status=status.HTTP_200_OK)
 
 
 class ScheduleNeededSubmitView(APIView):
@@ -133,6 +185,17 @@ class ScheduleNeededSubmitView(APIView):
                 ScheduleNeededSlot(schedule=schedule, day=item["day"], hour=item["hour"], needed=True)
                 for item in slots
             ])
+
+            changes = [{"day": it["day"], "hour": it["hour"], "needed": True} for it in slots]
+            transaction.on_commit(lambda: broadcast_to_room(
+                schedule.room_id,
+                {
+                    "event": "needed.updated",
+                    "room_id": schedule.room_id,
+                    "week_id": schedule.id,
+                    "changes": changes,   # diff 페이로드
+                },
+            ))
 
         return Response(
             {"schedule_id": schedule.id, "submitted_slots": len(slots), "status": schedule.status},
@@ -175,6 +238,19 @@ class ScheduleAvailabilitySubmitView(APIView):
                     for item in slots
                 ])
                 ScheduleAvailabilitySubmission.objects.create(schedule=schedule, user=request.user)
+
+                slot_list = [{"day": it["day"], "hour": it["hour"]} for it in slots]
+                user_payload = {"id": request.user.id, "name": getattr(request.user, "name", None)}
+                transaction.on_commit(lambda: broadcast_to_room(
+                    schedule.room_id,
+                    {
+                        "event": "availability.submitted",
+                        "room_id": schedule.room_id,
+                        "week_id": schedule.id,
+                        "user": user_payload,
+                        "slots": slot_list,
+                    },
+                ))
         except IntegrityError:
             return Response(
                 {"detail": "동시에 제출이 시도되어 충돌이 발생했습니다. 다시 시도해 주세요."},
@@ -321,6 +397,20 @@ class ScheduleFinalizeView(APIView):
                 schedule.status = "finalized"
                 schedule.finalized_at = now
                 schedule.save(update_fields=["status", "finalized_at"])
+                assigned = [
+                    {"day": d, "hour": h, "assignee": {"id": uid}}
+                    for (d, h, uid) in final_pairs
+                ]
+                transaction.on_commit(lambda: broadcast_to_room(
+                    schedule.room_id,
+                    {
+                        "event": "schedule.finalized",
+                        "room_id": schedule.room_id,
+                        "week_id": schedule.id,
+                        "assignments": assigned,
+                        "finalized_at": schedule.finalized_at.isoformat(),
+                    },
+                ))
         except Exception:
             return Response(
                 {"detail": "저장 중 오류가 발생했습니다."},
@@ -402,6 +492,18 @@ class ScheduleImportPreviousView(APIView):
                 target.status = "finalized"
                 target.finalized_at = now
                 target.save(update_fields=["status", "finalized_at"])
+                assignments = [{"day": r.day, "hour": r.hour, "assignee": {"id": r.assignee_id}} for r in src_qs]
+                transaction.on_commit(lambda: broadcast_to_room(
+                    target.room_id,
+                    {
+                        "event": "schedule.imported",
+                        "room_id": target.room_id,
+                        "week_id": target.id,
+                        "assignments": assignments,
+                        "finalized_at": target.finalized_at.isoformat(),
+                        "source_week_id": source.id,
+                    },
+                ))
         except Exception:
             return Response({"detail": "복사 중 오류가 발생했습니다."},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
