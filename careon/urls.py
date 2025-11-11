@@ -25,6 +25,7 @@ urlpatterns = [
     path('auth/', include("user.urls")),
     path("", include("room.urls")), 
     path("", include("schedule.urls")),
+    path("", include("log.urls")),
 ]
 
 

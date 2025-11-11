@@ -529,7 +529,8 @@ class ScheduleHistoryView(APIView):
 
         room = get_object_or_404(Room, id=room_id)
         if not IsRoomMemberOrOwner().has_object_permission(request, self, room):
-            return Response({"detail": "이 방의 스케줄을 조회할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "이 방의 스케줄을 조회할 권한이 없습니다."},
+                            status=status.HTTP_403_FORBIDDEN)
 
         qs = (Schedule.objects
               .filter(room_id=room_id)
@@ -537,7 +538,9 @@ class ScheduleHistoryView(APIView):
 
         items = []
         for s in qs:
-            iso_year, iso_week, _ = s.start_date.isocalendar()
+            
+            label_base = s.start_date + timedelta(days=1)
+            iso_year, iso_week, _ = label_base.isocalendar()
             items.append({
                 "week": f"{iso_year}-W{iso_week:02d}",
                 "status": s.status,
@@ -546,4 +549,5 @@ class ScheduleHistoryView(APIView):
             })
 
         out = {"room_id": room_id, "history": items}
-        return Response(ScheduleHistoryResponseSerializer(out).data, status=status.HTTP_200_OK)
+        return Response(ScheduleHistoryResponseSerializer(out).data,
+                        status=status.HTTP_200_OK)

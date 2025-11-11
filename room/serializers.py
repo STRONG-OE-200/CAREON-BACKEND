@@ -80,7 +80,7 @@ class RoomJoinSerializer(serializers.Serializer):
 class RoomMembershipSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     user_name = serializers.CharField(source="user.name", read_only=True)
-
+    membership_index = serializers.IntegerField(read_only=True)
     class Meta:
         model = RoomMembership
-        fields = ("id", "room", "user_id", "user_name", "relation", "role", "joined_at")
+        fields = ("id", "room", "user_id", "user_name", "relation", "role", "joined_at", "membership_index",)

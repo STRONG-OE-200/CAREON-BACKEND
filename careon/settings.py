@@ -14,7 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from datetime import timedelta
-
+from corsheaders.defaults import default_headers
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "user",
     "room",
     "schedule",
+    "log",
 ]
 
 MIDDLEWARE = [
@@ -204,3 +205,10 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
 }
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "Cache-Control",
+    "Pragma",
+    "Expires",
+]
+CORS_EXPOSE_HEADERS = ["Cache-Control", "Pragma", "Expires"]
