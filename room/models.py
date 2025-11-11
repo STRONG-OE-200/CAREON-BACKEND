@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
-
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from log.models import LogMetric
 # Create your models here.
 
 class Room(models.Model):
@@ -16,6 +18,13 @@ class Room(models.Model):
         return f"Room(id={self.id}, patient={self.patient})"
     
 
+
+@receiver(post_save, sender=Room)
+def create_default_metrics(sender, instance, created, **kwargs):
+    if created:
+        defaults = ["체온", "혈압"]
+        for label in defaults:
+            LogMetric.objects.get_or_create(room=instance, label=label)
 class RoomMembership(models.Model):
 
 
