@@ -64,15 +64,25 @@ class RoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="members")
     def members(self, request, pk=None):
-        room = self.get_object()  # 여기서 객체 찾고, 위 get_permissions 로 403 처리됨
-        memberships = (
+        room = self.get_object()
+
+        base_qs = (
             RoomMembership.objects
             .filter(room=room)
             .select_related("user", "room")
-            .order_by("-joined_at")
+            .order_by("joined_at", "id")
         )
+
+        memberships = list(base_qs)
+
+        for idx, m in enumerate(memberships):
+            m.membership_index = idx
+
+        memberships.sort(key=lambda m: (m.joined_at, m.id), reverse=False)
+
         data = RoomMembershipSerializer(memberships, many=True).data
         return Response(data, status=status.HTTP_200_OK)
+
 
 
     @action(detail=True, methods=["delete"], url_path=r"members/(?P<user_id>\d+)")
