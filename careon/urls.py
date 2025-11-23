@@ -26,6 +26,6 @@ urlpatterns = [
     path("", include("room.urls")), 
     path("", include("schedule.urls")),
     path("", include("log.urls")),
+    path("", include("calender.urls")),
 ]
-
 
