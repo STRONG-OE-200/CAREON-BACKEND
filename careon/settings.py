@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "room",
     "schedule",
     "log",
+    "calender",
 ]
 
 MIDDLEWARE = [
