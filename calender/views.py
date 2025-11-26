@@ -94,7 +94,7 @@ class RoomEventListCreateAPIView(APIView):
 
         # date or 기간 필터링
         if date_str:
-            # 필요하면 parse_date로 검증 추가 가능
+        
             events = events.filter(date=date_str)
         elif start_date_str and end_date_str:
             start_date = parse_date(start_date_str)
@@ -165,7 +165,10 @@ class RoomEventListCreateAPIView(APIView):
                 type=att["type"],
             )
 
-        return Response(CalendarEventSerializer(event).data, status=200)
+        return Response(
+            CalendarEventSerializer(event, context={"request": request}).data,
+            status=200,
+            )
 
 
 class EventDetailAPIView(APIView):
@@ -181,7 +184,9 @@ class EventDetailAPIView(APIView):
         event, err = self.get_event(event_id, request.user)
         if err:
             return err
-        return Response(CalendarEventSerializer(event).data)
+        return Response(
+            CalendarEventSerializer(event, context={"request": request}).data
+            )
 
     def patch(self, request, event_id):
         event, err = self.get_event(event_id, request.user)
@@ -209,7 +214,9 @@ class EventDetailAPIView(APIView):
                 setattr(event, field, value)
 
         event.save()
-        return Response(CalendarEventSerializer(event).data)
+        return Response(
+            CalendarEventSerializer(event, context={"request": request}).data
+            )
 
     def delete(self, request, event_id):
         event, err = self.get_event(event_id, request.user)
@@ -219,11 +226,6 @@ class EventDetailAPIView(APIView):
         return Response({"success": True, "deleted_id": event_id})
 
 class FileUploadAPIView(APIView):
-    """
-    파일 업로드 API
-    - FormData key: file (이미지/음성 공통)
-    - 추가 필드: type = IMAGE | AUDIO
-    """
 
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated]
