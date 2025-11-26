@@ -69,3 +69,20 @@ class CalendarAttachment(models.Model):
 
     def __str__(self):
         return f"{self.type} - {self.file_id}"
+
+class UploadedFile(models.Model):
+    class FileType(models.TextChoices):
+        IMAGE = "IMAGE", "Image"
+        AUDIO = "AUDIO", "Audio"
+
+    # 이미지, 녹음 파일 둘 다 해당 필드에 저장
+    file = models.FileField(upload_to="uploads/%Y/%m/%d/")
+    type = models.CharField(max_length=10, choices=FileType.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.type} - {self.id}"
+
+    @property
+    def file_id(self) -> str:
+        return str(self.id)

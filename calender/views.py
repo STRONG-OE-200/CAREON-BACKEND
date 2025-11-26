@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 
 from room.models import Room
@@ -13,6 +14,9 @@ from .serializers import (
     CalendarEventCreateUpdateSerializer,
 )
 from .utils import is_room_member
+
+from .models import UploadedFile
+from .serializers import UploadedFileSerializer
 
 
 def error_response(code, msg, status_code, detail=None):
@@ -146,3 +150,33 @@ class EventDetailAPIView(APIView):
             return err
         event.delete()
         return Response({"success": True, "deleted_id": event_id})
+
+class FileUploadAPIView(APIView):
+    """
+    파일 업로드 API
+    - FormData key: file (이미지/음성 공통)
+    - 추가 필드: type = IMAGE | AUDIO
+    """
+
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        uploaded = request.FILES.get("file")
+        file_type = request.data.get("type")
+
+        if not uploaded:
+            return Response(
+                {"detail": "file 필드는 필수입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if file_type not in [UploadedFile.FileType.IMAGE, UploadedFile.FileType.AUDIO]:
+            return Response(
+                {"detail": "type 필드는 IMAGE 또는 AUDIO 여야 합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj = UploadedFile.objects.create(file=uploaded, type=file_type)
+        serializer = UploadedFileSerializer(obj, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
