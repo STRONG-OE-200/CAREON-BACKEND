@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_date
 
 from room.models import Room
 from user.models import CustomUser as User
@@ -35,13 +36,23 @@ class RoomEventListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_room(self, room_id, user):
-        room = get_object_or_404(Room, id=room_id)
+        try:
+            room = Room.objects.get(id=room_id)
+        except Room.DoesNotExist:
+            return None, error_response(
+                "ROOM_NOT_FOUND",
+                "요청하신 방을 찾을 수 없습니다.",
+                status.HTTP_404_NOT_FOUND,
+                detail={"location": "path", "value": f"room_id={room_id}"},
+            )
+
         if not is_room_member(room, user):
             return None, error_response(
                 "ROOM_MEMBER_ONLY",
                 "해당 방 멤버만 일정에 접근할 수 있습니다.",
                 status.HTTP_403_FORBIDDEN,
-            )
+         )
+
         return room, None
 
     def get(self, request, room_id):
@@ -49,13 +60,69 @@ class RoomEventListCreateAPIView(APIView):
         if err:
             return err
 
-        date = request.query_params.get("date")
+        params = request.query_params
+        date_str = params.get("date")
+        start_date_str = params.get("start_date")
+        end_date_str = params.get("end_date")
+        include_time_raw = params.get("include_time")
+
+        # date + (start_date/end_date) 같이 오면 400
+        if date_str and (start_date_str or end_date_str):
+            return error_response(
+                "CALENDAR_INVALID_QUERY",
+                "단일 날짜(date)와 기간(start_date, end_date)을 동시에 지정할 수 없습니다.",
+                status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "location": "query",
+                    "fields": ["date", "start_date", "end_date"],
+                },
+            )
+
+        # start_date, end_date 둘 중 하나만 온 경우도 에러 처리
+        if (start_date_str and not end_date_str) or (end_date_str and not start_date_str):
+            return error_response(
+                "CALENDAR_INVALID_QUERY",
+                "기간 조회 시 start_date와 end_date를 함께 지정해야 합니다.",
+                status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "location": "query",
+                    "fields": ["start_date", "end_date"],
+                },
+            )
+
         events = CalendarEvent.objects.filter(room=room)
-        if date:
-            events = events.filter(date=date)
+
+        # date or 기간 필터링
+        if date_str:
+            # 필요하면 parse_date로 검증 추가 가능
+            events = events.filter(date=date_str)
+        elif start_date_str and end_date_str:
+            start_date = parse_date(start_date_str)
+            end_date = parse_date(end_date_str)
+            if not start_date or not end_date:
+                return error_response(
+                    "CALENDAR_INVALID_QUERY",
+                    "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식을 사용하세요.",
+                    status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "location": "query",
+                        "fields": ["start_date", "end_date"],
+                    },
+                )
+            events = events.filter(date__range=[start_date, end_date])
 
         serializer = CalendarEventSummarySerializer(events, many=True)
-        return Response({"room_id": room.id, "events": serializer.data})
+        data = serializer.data
+
+        # include_time 처리 (기본: False → 시간 null 처리)
+        include_time = str(include_time_raw).lower() in ("true", "1", "yes")
+        if not include_time:
+            for item in data:
+                item["start_at"] = None
+                item["end_at"] = None
+
+        return Response({"room_id": room.id, "events": data})
+    
     def post(self, request, room_id):
         room, err = self.get_room(room_id, request.user)
         if err:

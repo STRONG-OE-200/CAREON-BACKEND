@@ -38,10 +38,27 @@ class CalendarEventSummarySerializer(serializers.ModelSerializer):
 class CalendarEventSerializer(serializers.ModelSerializer):
     attachments = CalendarAttachmentSerializer(many=True, read_only=True)
     assignee = AssigneeSerializer(read_only=True)
+    # ✅ 명세서용 room_id 필드 추가
+    room_id = serializers.IntegerField(source="room.id", read_only=True)
 
     class Meta:
         model = CalendarEvent
-        fields = "__all__"
+        fields = (
+            "id",
+            "room_id",
+            "date",
+            "title",
+            "start_at",
+            "end_at",
+            "is_all_day",
+            "repeat_rule",
+            "repeat_until",
+            "description",
+            "attachments",
+            "assignee",
+            "created_at",
+            "updated_at",
+        )
 
 
 class CalendarEventCreateUpdateSerializer(serializers.Serializer):
