@@ -11,9 +11,23 @@ class CalendarAttachmentInputSerializer(serializers.Serializer):
 
 
 class CalendarAttachmentSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()  
     class Meta:
         model = CalendarAttachment
         fields = ("id", "type", "url", "file_id")
+
+    def get_url(self, obj):
+        try:
+            uploaded = UploadedFile.objects.get(id=int(obj.file_id))
+        except (UploadedFile.DoesNotExist, ValueError, TypeError):
+            return ""
+
+        request = self.context.get("request")
+        if uploaded.file and hasattr(uploaded.file, "url"):
+            if request is not None:
+                return request.build_absolute_uri(uploaded.file.url)
+            return uploaded.file.url
+        return ""
 
 
 class AssigneeSerializer(serializers.ModelSerializer):
@@ -42,10 +56,10 @@ class CalendarEventSummarySerializer(serializers.ModelSerializer):
     def to_local(self, dt):
         if not dt:
             return None
-        # ✅ DB에 저장된 naive datetime을 "UTC"로 간주
+        
         if timezone.is_naive(dt):
             dt = timezone.make_aware(dt, dt_timezone.utc)
-        # ✅ 한국 시간대(Asia/Seoul)으로 변환
+        
         return timezone.localtime(dt).isoformat()
 
     def get_start_at(self, obj):
