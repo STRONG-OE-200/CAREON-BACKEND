@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import CalendarEvent, CalendarAttachment
 from user.models import CustomUser as User
 from .models import UploadedFile
+from django.utils.timezone import localtime, get_current_timezone
 
 class CalendarAttachmentInputSerializer(serializers.Serializer):
     file_id = serializers.CharField()
@@ -38,8 +39,13 @@ class CalendarEventSummarySerializer(serializers.ModelSerializer):
 class CalendarEventSerializer(serializers.ModelSerializer):
     attachments = CalendarAttachmentSerializer(many=True, read_only=True)
     assignee = AssigneeSerializer(read_only=True)
-    # ✅ 명세서용 room_id 필드 추가
+
+    # 📌 명세서 요구: room_id 별도 필드
     room_id = serializers.IntegerField(source="room.id", read_only=True)
+
+    # 📌 시간 변환 필드 (Asia/Seoul 기준으로 변환해서 출력)
+    start_at = serializers.SerializerMethodField()
+    end_at = serializers.SerializerMethodField()
 
     class Meta:
         model = CalendarEvent
@@ -59,6 +65,12 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def get_start_at(self, obj):
+        return localtime(obj.start_at).isoformat() if obj.start_at else None
+
+    def get_end_at(self, obj):
+        return localtime(obj.end_at).isoformat() if obj.end_at else None
 
 
 class CalendarEventCreateUpdateSerializer(serializers.Serializer):
