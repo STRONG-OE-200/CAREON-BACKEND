@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import CalendarEvent, CalendarAttachment
 from user.models import CustomUser as User
-
+from .models import UploadedFile
 
 class CalendarAttachmentInputSerializer(serializers.Serializer):
     file_id = serializers.CharField()
@@ -80,3 +80,19 @@ class CalendarEventCreateUpdateSerializer(serializers.Serializer):
             })
 
         return attrs
+
+class UploadedFileSerializer(serializers.ModelSerializer):
+    file_id = serializers.ReadOnlyField()
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UploadedFile
+        fields = ["file_id", "type", "url"]
+
+    def get_url(self, obj):
+        request = self.context.get("request")
+        if obj.file and hasattr(obj.file, "url"):
+            if request is not None:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return ""
