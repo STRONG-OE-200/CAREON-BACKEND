@@ -1,8 +1,9 @@
 from rest_framework import serializers
-from .models import CalendarEvent, CalendarAttachment
+from .models import CalendarEvent, CalendarAttachment, UploadedFile
 from user.models import CustomUser as User
-from .models import UploadedFile
-from django.utils.timezone import localtime, get_current_timezone
+from django.utils import timezone
+from datetime import timezone as dt_timezone
+
 
 class CalendarAttachmentInputSerializer(serializers.Serializer):
     file_id = serializers.CharField()
@@ -18,11 +19,13 @@ class CalendarAttachmentSerializer(serializers.ModelSerializer):
 class AssigneeSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "name")   # CustomUser.name 사용
+        fields = ("id", "name")
 
 
 class CalendarEventSummarySerializer(serializers.ModelSerializer):
     assignee = AssigneeSerializer(read_only=True)
+    start_at = serializers.SerializerMethodField()
+    end_at = serializers.SerializerMethodField()
 
     class Meta:
         model = CalendarEvent
@@ -33,17 +36,31 @@ class CalendarEventSummarySerializer(serializers.ModelSerializer):
             "start_at",
             "end_at",
             "assignee",
+            "is_all_day",
         )
+
+    def to_local(self, dt):
+        if not dt:
+            return None
+        # ✅ DB에 저장된 naive datetime을 "UTC"로 간주
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, dt_timezone.utc)
+        # ✅ 한국 시간대(Asia/Seoul)으로 변환
+        return timezone.localtime(dt).isoformat()
+
+    def get_start_at(self, obj):
+        return self.to_local(obj.start_at)
+
+    def get_end_at(self, obj):
+        return self.to_local(obj.end_at)
+
 
 
 class CalendarEventSerializer(serializers.ModelSerializer):
     attachments = CalendarAttachmentSerializer(many=True, read_only=True)
     assignee = AssigneeSerializer(read_only=True)
-
-    # 📌 명세서 요구: room_id 별도 필드
     room_id = serializers.IntegerField(source="room.id", read_only=True)
 
-    # 📌 시간 변환 필드 (Asia/Seoul 기준으로 변환해서 출력)
     start_at = serializers.SerializerMethodField()
     end_at = serializers.SerializerMethodField()
 
@@ -66,11 +83,19 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
+    def to_local(self, dt):
+        if not dt:
+            return None
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, dt_timezone.utc)
+        return timezone.localtime(dt).isoformat()
+
     def get_start_at(self, obj):
-        return localtime(obj.start_at).isoformat() if obj.start_at else None
+        return self.to_local(obj.start_at)
 
     def get_end_at(self, obj):
-        return localtime(obj.end_at).isoformat() if obj.end_at else None
+        return self.to_local(obj.end_at)
+
 
 
 class CalendarEventCreateUpdateSerializer(serializers.Serializer):
@@ -109,6 +134,7 @@ class CalendarEventCreateUpdateSerializer(serializers.Serializer):
             })
 
         return attrs
+
 
 class UploadedFileSerializer(serializers.ModelSerializer):
     file_id = serializers.ReadOnlyField()
