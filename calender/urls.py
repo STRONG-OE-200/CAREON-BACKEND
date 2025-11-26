@@ -5,18 +5,18 @@ from .views import RoomEventListCreateAPIView, EventDetailAPIView, FileUploadAPI
 urlpatterns = [
     # /rooms/{room_id}/calendar/events
     path(
-        "rooms/<int:room_id>/calender/events",
+        "rooms/<int:room_id>/calendar/events/",
         RoomEventListCreateAPIView.as_view(),
         name="room-calender-events",
     ),
-    # /calendar/events/{event_id}
+    # /calendar/events/{event_id}/
     path(
-        "calender/events/<int:event_id>",
+        "calendar/events/<int:event_id>/",
         EventDetailAPIView.as_view(),
         name="calendar-event-detail",
     ),
     path(
-        "files/upload",
+        "files/upload/",
         FileUploadAPIView.as_view(),
         name="file-upload",
     ),
