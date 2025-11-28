@@ -5,6 +5,8 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 from room.models import Room
 from user.models import CustomUser as User
@@ -90,12 +92,12 @@ class RoomEventListCreateAPIView(APIView):
                 },
             )
 
-        events = CalendarEvent.objects.filter(room=room)
+        events = CalendarEvent.objects.filter(room=room).order_by("date", "start_at")
 
         # date or 기간 필터링
         if date_str:
         
-            events = events.filter(date=date_str)
+            events = events.filter(date=date_str).order_by("date", "start_at")
         elif start_date_str and end_date_str:
             start_date = parse_date(start_date_str)
             end_date = parse_date(end_date_str)
@@ -109,7 +111,7 @@ class RoomEventListCreateAPIView(APIView):
                         "fields": ["start_date", "end_date"],
                     },
                 )
-            events = events.filter(date__range=[start_date, end_date])
+            events = events.filter(date__range=[start_date, end_date]).order_by("date", "start_at")
 
         serializer = CalendarEventSummarySerializer(events, many=True)
         data = serializer.data
@@ -134,6 +136,7 @@ class RoomEventListCreateAPIView(APIView):
 
         v = serializer.validated_data
 
+    # 담당자 처리
         assignee = None
         if "assignee_id" in v and v["assignee_id"]:
             try:
@@ -144,31 +147,91 @@ class RoomEventListCreateAPIView(APIView):
             if not is_room_member(room, assignee):
                 return error_response("ASSIGNEE_NOT_ROOM_MEMBER", "담당자는 방 멤버여야 합니다.", 400)
 
-        event = CalendarEvent.objects.create(
+        repeat_rule = v.get("repeat_rule", "NONE")
+        repeat_until = v.get("repeat_until")
+
+        events = []
+
+        # 원본 이벤트 생성
+        base_event = CalendarEvent.objects.create(
             room=room,
             date=v["date"],
             title=v["title"],
             start_at=v["start_at"],
             end_at=v["end_at"],
             is_all_day=v.get("is_all_day", False),
-            repeat_rule=v.get("repeat_rule", "NONE"),
-            repeat_until=v.get("repeat_until"),
+            repeat_rule=repeat_rule,
+            repeat_until=repeat_until,
             description=v.get("description"),
             assignee=assignee,
         )
+        events.append(base_event)
 
-        # attachments
+    # attachments 생성
         for att in v.get("attachments", []):
             CalendarAttachment.objects.create(
-                event=event,
-                file_id=att["file_id"],
+                event=base_event,
+             file_id=att["file_id"],
                 type=att["type"],
             )
 
+    # 반복 일정 실제 여러 개 생성
+        if repeat_rule != "NONE" and repeat_until:
+            current_date = v["date"]
+
+            while True:
+                # 반복 규칙에 따라 날짜 증가
+                if repeat_rule == "DAILY":
+                    current_date += timedelta(days=1)
+                elif repeat_rule == "WEEKLY":
+                    current_date += timedelta(weeks=1)
+                elif repeat_rule == "MONTHLY":
+                    current_date += relativedelta(months=1)
+
+                # 반복 종료 조건
+                if current_date > repeat_until:
+                    break
+
+                # start/end_at도 날짜만 current_date 기반으로 교체
+                new_start = v["start_at"].replace(
+                    year=current_date.year,
+                    month=current_date.month,
+                    day=current_date.day,
+                )
+                new_end = v["end_at"].replace(
+                    year=current_date.year,
+                    month=current_date.month,
+                    day=current_date.day,
+                )
+
+            # 이벤트 생성
+                ev = CalendarEvent.objects.create(
+                    room=room,
+                    date=current_date,
+                    title=v["title"],
+                    start_at=new_start,
+                    end_at=new_end,
+                    is_all_day=v.get("is_all_day", False),
+                    repeat_rule="NONE",   # 복제된 이벤트들은 반복 X
+                    repeat_until=None,
+                    description=v.get("description"),
+                    assignee=assignee,
+                )
+                events.append(ev)
+
+            # attachments도 복제
+                for att in v.get("attachments", []):
+                    CalendarAttachment.objects.create(
+                        event=ev,
+                        file_id=att["file_id"],
+                        type=att["type"],
+                    )
+
+    # 기존 API 구조상 원본 이벤트만 반환
         return Response(
-            CalendarEventSerializer(event, context={"request": request}).data,
+            CalendarEventSerializer(base_event, context={"request": request}).data,
             status=200,
-            )
+        )
 
 
 class EventDetailAPIView(APIView):
