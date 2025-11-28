@@ -64,7 +64,7 @@ class CalendarAttachment(models.Model):
     file_id = models.CharField(max_length=255)
     type = models.CharField(max_length=10, choices=AttachmentType.choices)
 
-    # 실제 파일 URL은 파일 서비스 쪽에서 만들어준다고 가정
+    
     url = models.URLField(max_length=2048, blank=True, default="")
 
     def __str__(self):
